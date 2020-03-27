@@ -447,14 +447,15 @@ void clear(studentArray *array) {
 /**/
 int add_class(node **head, short int code) {
     node *ptr, *prev, *newNode;
-    
+
+    newNode = (node *) malloc(sizeof(node));
+    newNode->code = code;
+
     for (ptr = *head, prev = NULL; ptr != NULL && ptr->code <= code; prev = ptr, ptr = ptr->next);
 
     if (prev != NULL && prev->code == code) {
         return 0;
     }
-
-    newNode = (node *) malloc(sizeof(node));
     
     if (newNode == NULL) {
         return -1;
@@ -465,17 +466,16 @@ int add_class(node **head, short int code) {
     else {    
         prev->next = newNode;
     }
-    newNode->code = code;
     newNode->next = ptr;
     return 1;
 }
 /**/
 int find_class(node **head, short int code) {
-    node *ptr, *prev;
+    node *ptr;
 
-    for (ptr = *head, prev = NULL; ptr != NULL && ptr->code <= code; prev = ptr, ptr = ptr->next);
+    for (ptr = *head; ptr != NULL && ptr->code < code; ptr = ptr->next);
 
-    if (prev != NULL && prev->code == code) {
+    if (ptr != NULL && ptr->code == code) {
         return 1;
     }
     else {
