@@ -107,7 +107,7 @@ int list_courses(studentArray *array, long unsigned int AEM);
 void init_list(student **head);
 /*Initializes an empty double linked-list*/
 
-int find_std(student *head, char *name);
+bool find_std(student *head, char *name);
 /*Searches for a student in a double linked-list by name, and returns how many
  students with that name are in the list*/
 
