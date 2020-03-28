@@ -12,6 +12,8 @@ typedef struct student {
     char name[64];
     short unsigned int numOfClasses;
     struct node *classesHead;
+    struct student *next;
+    struct student *prev;
 } student;
 
 typedef struct studentArray {
@@ -68,7 +70,10 @@ void print(studentArray *array);
 void clear(studentArray *array);
 /*Free memory*/
 
-/**Simple List Functions**/
+/**/
+
+/**Simple Linked-List Functions**/
+
 int add_class(node **head, short int code);
 /*Adds a new class to the liked list of a student's classes, returns 1 for success, else 0*/
 
@@ -83,25 +88,49 @@ void print_classes(node *head);
 
 /**/
 
-/*LEITOURGIESSSSS(kai afto tha fugei)*/
-
-/**/
 int reg(studentArray *array, long unsigned int AEM, unsigned short code);
 /*Returns 1 for succes, 0 for non-existing AEM, -1 for existing class*/
+
 int unreg(studentArray *array, long unsigned int AEM, unsigned short code);
 /*Returns 1 for succes, 0 for non-existing AEM, -1 for non-existing class*/
+
 int isreg(studentArray *array, long unsigned int AEM, unsigned short code);
 /*Returns 1 for succes, 0 for non-existing AEM, -1 for non-existing class*/
+
 int list_courses(studentArray *array, long unsigned int AEM);
 /*Prints all the courses of the student with the given AEM, returns 1, if student-not-found returns 0*/
+
+/**/
+
+/**Double Linked-List Functions**/
+
+void init_list(student **head);
+/*Initializes an empty double linked-list*/
+
+int find_std(student *head, char *name);
+/*Searches for a student in a double linked-list by name, and returns how many
+ students with that name are in the list*/
+
+void insert_std(student **head, student *std);
+/*Inserts an existing student node to a double linked-list*/
+
+void rmv_std(student **head, student *std);
+/*Removes an student node from a double linked-list, does not delete the node*/
+
+void init_string(char *string) {
+    char c = string[0];
+    while (c != '\n') {
+        c = '\n';
+    }
+}
 
 /*MAIN*/
 
 int main(int argc, char* argv[]) {
-    if (argc != 3 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
-        fprintf(stderr, "\n***\nWrong arguments!\n***\n");
-        return 0;
-    }
+    // if (argc != 3 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
+    //     fprintf(stderr, "\n***\nWrong arguments!\n***\n");
+    //     return 0;
+    // }
     int res=0;
     short unsigned int newNumOfClasses, classes, c_code;
     long unsigned int newAEM, AEM;
@@ -110,135 +139,178 @@ int main(int argc, char* argv[]) {
     studentArray myArray;
     arrayInit(&myArray, argv);
 
-    while (1) {
-        scanf(" %c", &func);
-        switch (func) {
-            case 'a': {
-                res = scanf("%lu %s %hu", &newAEM, newName, &newNumOfClasses);
-                upper(newName);
-                if (res != 0) {
-                    res = add(&myArray, newAEM, newName, newNumOfClasses);
-                    if (res == 1) {
-                        printf("\nA-OK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
-                    }
-                    else {
-                        printf("\nA-NOK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
-                    }
-                }
-                break;
-            }
-            case 'r': {
-                scanf("%lu",&AEM);
-                res = rmv(&myArray, AEM);
-                if (res == 1) {
-                    printf("\nR-OK %lu, %d %d\n", AEM, myArray.used, myArray.size);    
-                }
-                else {
-                    printf("\nR-NOK %lu, %d %d\n", AEM, myArray.used, myArray.size);
-                }
-                break;
-            }
-            case 'm': {
-                scanf("%ld %hu", &AEM, &classes);
-                res = mod(&myArray, AEM, classes);
-                if (res == 1) {
-                    printf("\nM-OK %ld\n", AEM);
-                }
-                else {
-                    printf("\nM-NOK %ld\n", AEM);
-                }
-                break;
-            }
-            case 's': {
-                sort(&myArray);
-                printf("\nS-OK\n");
-                break;
-            }
-            case 'f': {
-                scanf("%ld", &AEM);
-                res = find(&myArray, AEM, 0);
-                if (res == -1) {
-                    printf("\nF-NOK %ld\n", AEM);
-                }
-                else {
-                    printf("\nF-OK %s %hu\n", myArray.array[res]->name, myArray.array[res]->numOfClasses);
-                }
-                break;
-            }
-            case 'p': {
-                print(&myArray);
-                break;
-            }
-            case 'c': {
-                clear(&myArray);
-                printf("\nC-OK\n");
-                break;
-            }
-            case 'q': {
-                clear(&myArray);
-                return(0);
-            }
-            case 'g': {
-                scanf("%ld %hu", &AEM, &c_code);
-                res = reg(&myArray, AEM, c_code);
-                if (res == 1) {
-                    printf("\nG-OK %ld %hu\n", AEM, c_code);
-                }
-                else {
-                    printf("\nG-NOK ");
-                    if (res == 0) {
-                        printf("%ld\n", AEM);
-                    }
-                    else {
-                        printf("%hu\n", c_code);
-                    }
-                }
-                break;
-            }
-            case 'u': {
-                scanf("%ld %hu", &AEM, &c_code);
-                res = unreg(&myArray, AEM, c_code);
-                if (res == 1) {
-                    printf("\nU-OK %ld %hu\n", AEM, c_code);
-                }
-                else {
-                    printf("\nU-NOK ");
-                    if (res == 0) {
-                        printf("%ld\n", AEM);
-                    }
-                    else {
-                        printf("%hu\n", c_code);
-                    }
-                }
-                break;
-            }
-            case 'l': {
-                scanf("%lu", &AEM);
-                res = list_courses(&myArray, AEM);
-                if (res == 0) {
-                    printf("\nL-NOK %lu\n", AEM);
-                }
-                break;
-            }
-            case 'i': {
-                scanf("%ld %hu", &AEM, &c_code);
-                res = isreg(&myArray, AEM, c_code);
-                if (res == 1) {
-                    printf("\nYES\n");
-                }
-                else if (res == -1) {
-                    printf("\nNO\n");
-                }
-                else {
-                    printf("\nI-NOK %ld\n", AEM);
-                }
-                break;
-            }
-            default: {
-                break;
-            }
-        }
+
+    student *head;
+    add(&myArray, 1, "aaa", 0);
+    add(&myArray, 2, "bb", 0);
+    add(&myArray, 3, "c", 0);
+    add(&myArray, 4, "a_b", 1);
+    add(&myArray, 5, "c", 3);
+    init_list(&head);
+    insert_std(&head, myArray.array[0]);
+    insert_std(&head, myArray.array[1]);
+    insert_std(&head, myArray.array[2]);
+    insert_std(&head, myArray.array[3]);
+    char str1[64] = "aaa";
+    char str2[64] = "bb";
+    char str3[64] = "c";
+    char str4[64] = "a_b";
+    if (find_std(head, str1)) {
+        printf("Found %s\n", str1);
     }
+    else {
+        printf("Not-Found %s\n", str1);
+    }
+    if (find_std(head, str2)) {
+        printf("Found %s\n", str2);
+    }
+    else {
+        printf("Not-Found %s\n", str2);
+    }
+    rmv_std(&head, myArray.array[2]);
+    rmv_std(&head, myArray.array[3]);
+    if (find_std(head, str3)) {
+        printf("Found %s\n", str3);
+    }
+    else {
+        printf("Not-Found %s\n", str3);
+    }
+    if (find_std(head, str4)) {
+        printf("Found %s\n", str4);
+    }
+    else {
+        printf("Not-Found %s\n", str4);
+    }
+    
+    // while (1) {
+    //     scanf(" %c", &func);
+    //     switch (func) {
+    //         case 'a': {
+    //             res = scanf("%lu %s %hu", &newAEM, newName, &newNumOfClasses);
+    //             upper(newName);
+    //             if (res != 0) {
+    //                 res = add(&myArray, newAEM, newName, newNumOfClasses);
+    //                 if (res == 1) {
+    //                     printf("\nA-OK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
+    //                 }
+    //                 else {
+    //                     printf("\nA-NOK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
+    //                 }
+    //             }
+    //             break;
+    //         }
+    //         case 'r': {
+    //             scanf("%lu",&AEM);
+    //             res = rmv(&myArray, AEM);
+    //             if (res == 1) {
+    //                 printf("\nR-OK %lu, %d %d\n", AEM, myArray.used, myArray.size);    
+    //             }
+    //             else {
+    //                 printf("\nR-NOK %lu, %d %d\n", AEM, myArray.used, myArray.size);
+    //             }
+    //             break;
+    //         }
+    //         case 'm': {
+    //             scanf("%ld %hu", &AEM, &classes);
+    //             res = mod(&myArray, AEM, classes);
+    //             if (res == 1) {
+    //                 printf("\nM-OK %ld\n", AEM);
+    //             }
+    //             else {
+    //                 printf("\nM-NOK %ld\n", AEM);
+    //             }
+    //             break;
+    //         }
+    //         case 's': {
+    //             sort(&myArray);
+    //             printf("\nS-OK\n");
+    //             break;
+    //         }
+    //         case 'f': {
+    //             scanf("%ld", &AEM);
+    //             res = find(&myArray, AEM, 0);
+    //             if (res == -1) {
+    //                 printf("\nF-NOK %ld\n", AEM);
+    //             }
+    //             else {
+    //                 printf("\nF-OK %s %hu\n", myArray.array[res]->name, myArray.array[res]->numOfClasses);
+    //             }
+    //             break;
+    //         }
+    //         case 'p': {
+    //             print(&myArray);
+    //             break;
+    //         }
+    //         case 'c': {
+    //             clear(&myArray);
+    //             printf("\nC-OK\n");
+    //             break;
+    //         }
+    //         case 'q': {
+    //             clear(&myArray);
+    //             return(0);
+    //         }
+    //         case 'g': {
+    //             scanf("%ld %hu", &AEM, &c_code);
+    //             res = reg(&myArray, AEM, c_code);
+    //             if (res == 1) {
+    //                 printf("\nG-OK %ld %hu\n", AEM, c_code);
+    //             }
+    //             else {
+    //                 printf("\nG-NOK ");
+    //                 if (res == 0) {
+    //                     printf("%ld\n", AEM);
+    //                 }
+    //                 else {
+    //                     printf("%hu\n", c_code);
+    //                 }
+    //             }
+    //             break;
+    //         }
+    //         case 'u': {
+    //             scanf("%ld %hu", &AEM, &c_code);
+    //             res = unreg(&myArray, AEM, c_code);
+    //             if (res == 1) {
+    //                 printf("\nU-OK %ld %hu\n", AEM, c_code);
+    //             }
+    //             else {
+    //                 printf("\nU-NOK ");
+    //                 if (res == 0) {
+    //                     printf("%ld\n", AEM);
+    //                 }
+    //                 else {
+    //                     printf("%hu\n", c_code);
+    //                 }
+    //             }
+    //             break;
+    //         }
+    //         case 'l': {
+    //             scanf("%lu", &AEM);
+    //             res = list_courses(&myArray, AEM);
+    //             if (res == 0) {
+    //                 printf("\nL-NOK %lu\n", AEM);
+    //             }
+    //             break;
+    //         }
+    //         case 'i': {
+    //             scanf("%ld %hu", &AEM, &c_code);
+    //             res = isreg(&myArray, AEM, c_code);
+    //             if (res == 1) {
+    //                 printf("\nYES\n");
+    //             }
+    //             else if (res == -1) {
+    //                 printf("\nNO\n");
+    //             }
+    //             else {
+    //                 printf("\nI-NOK %ld\n", AEM);
+    //             }
+    //             break;
+    //         }
+    //         default: {
+    //             break;
+    //         }
+    //     }
+    // }
 }
 
 /*  FUNCTIONS  */
@@ -564,3 +636,51 @@ int list_courses(studentArray *array, long unsigned int AEM) {
         return 0;
     }
 }
+
+
+
+
+
+
+/*Double linked list functions*/
+
+void init_list(student **head) {
+    *head = (student *) calloc(1,sizeof(student));
+    (*head)->next = *head;
+    (*head)->prev = *head;
+}
+/**/
+bool find_std(student *head, char *name) {
+    student *ptr;
+    
+    strcpy(head->name, name);
+    for(ptr = head->next; strcmp(ptr->name, name); ptr = ptr->next);
+    init_string(head->name);
+    if (ptr == head)
+        return false;
+    else 
+        return true;
+}
+/**/
+void insert_std(student **head, student *std) {
+    student *ptr;
+    /*Define ptr*/
+    strcpy((*head)->name, std->name);
+    (*head)->AEM = std->AEM + 1;
+    for(ptr = (*head)->next; strcmp(ptr->name, std->name) < 0; ptr = ptr->next);
+
+    if (strcmp(ptr->name, std->name) == 0 && std->AEM < ptr->AEM) {
+        ptr = ptr->prev;
+    }
+    /*Add std after ptr*/
+    std->next = ptr->next;
+    std->prev = ptr;
+    ptr->next = std;
+    std->next->prev = std;
+}
+/**/
+void rmv_std(student **head, student *std) {
+    std->prev->next = std->next;
+    std->next->prev = std->prev;
+}
+/**/
