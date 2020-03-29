@@ -16,18 +16,31 @@ typedef struct student {
     struct student *prev;
 } student;
 
+typedef struct node {
+    unsigned short code;
+    struct node *next;
+} node;
+
+typedef struct bucket {
+    student *head;
+    int size;
+} bucket;
+
+typedef struct hashTable {
+    int size;
+    int load_factor;
+    int largest_bucket;
+    bucket *bucketArray;
+} hashTable;
+
 typedef struct studentArray {
     student **array;
     int size;
     int used;
     bool isSorted;
     short int k;
+    hashTable table;
 } studentArray;
-
-typedef struct node {
-    unsigned short code;
-    struct node *next;
-} node;
 
 /*  FUNCTION SIGNATURES  */
 
@@ -67,7 +80,7 @@ int mod(studentArray *array, int AEM, unsigned short int classes);
 void print(studentArray *array);
 /*Print the array*/
 
-void clear(studentArray *array);
+void clear(studentArray *array, char *argv[]);
 /*Free memory*/
 
 /**/
@@ -104,213 +117,224 @@ int list_courses(studentArray *array, long unsigned int AEM);
 
 /**Double Linked-List Functions**/
 
-void init_list(student **head);
+void init_list(bucket *bucket);
 /*Initializes an empty double linked-list*/
 
-bool find_std(student *head, char *name);
+int find_std(bucket bucket, char *name);
 /*Searches for a student in a double linked-list by name, and returns how many
- students with that name are in the list*/
+students with that name are in the list*/
 
-void insert_std(student **head, student *std);
+void insert_std(bucket *bucket, student *std);
 /*Inserts an existing student node to a double linked-list*/
 
-void rmv_std(student **head, student *std);
+void rmv_std(student *std);
 /*Removes an student node from a double linked-list, does not delete the node*/
 
 void init_string(char *string) {
     char c = string[0];
-    while (c != '\n') {
-        c = '\n';
+    while (c != '\0') {
+        c = '\0';
     }
 }
+/*Clears a string*/
+
+/**/
+
+/**Hash table functions**/
+
+unsigned long hash(char *str) {
+    unsigned long hash = 5381;
+    int c;
+
+    while ((c = *str++))
+        hash = ((hash << 5) + hash) + c;
+
+    return hash;
+}
+/*Returns hash value for a string*/
+
+int get_hash(hashTable *table, char *str);
+/*Returns the hash value mod the tables size*/
+
+void init_hash_table(hashTable *table);
+/*Initializes an empty hash table*/
+
+int get_load_factor(studentArray *array);
+/*Returns the hash tables load facrot*/
+
+void set_largest_bucket(hashTable table);
+/*Changes the largest bucket's value, if needed*/
+
+void add_to_hash(studentArray *array, student *std);
+/*adds a student to the hash table*/
+
+void rmv_from_hash(studentArray *array, student *std);
+/*removes an student from the hash table*/
+
+student **find_by_name(studentArray *array, char *name, int *num_of_std);
+/*Finds a student using the hash table, returns an array of pointers to the students if they exist,
+ else returns NULL, sets nom_of_std to the size of the returned array*/
+
+void rehash(studentArray *array);
+/*Depending on the lages bucket and the load factor's value, changes the tables size
+and reenters each student to the hash table*/
+/**/
 
 /*MAIN*/
 
 int main(int argc, char* argv[]) {
-    // if (argc != 3 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
-    //     fprintf(stderr, "\n***\nWrong arguments!\n***\n");
-    //     return 0;
-    // }
-    int res=0;
+    if (argc != 3 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
+        fprintf(stderr, "\n***\nWrong arguments!\n***\n");
+        return 0;
+    }
+    int res=0, num_of_stds, i;
     short unsigned int newNumOfClasses, classes, c_code;
     long unsigned int newAEM, AEM;
-    char newName[64], func;
+    char newName[64], func, name[64];
+    student **array_of_stds;
 
     studentArray myArray;
     arrayInit(&myArray, argv);
 
-
-    student *head;
-    add(&myArray, 1, "aaa", 0);
-    add(&myArray, 2, "bb", 0);
-    add(&myArray, 3, "c", 0);
-    add(&myArray, 4, "a_b", 1);
-    add(&myArray, 5, "c", 3);
-    init_list(&head);
-    insert_std(&head, myArray.array[0]);
-    insert_std(&head, myArray.array[1]);
-    insert_std(&head, myArray.array[2]);
-    insert_std(&head, myArray.array[3]);
-    char str1[64] = "aaa";
-    char str2[64] = "bb";
-    char str3[64] = "c";
-    char str4[64] = "a_b";
-    if (find_std(head, str1)) {
-        printf("Found %s\n", str1);
+    while (1) {
+        scanf(" %c", &func);
+        switch (func) {
+            case 'a': {
+                res = scanf("%lu %s %hu", &newAEM, newName, &newNumOfClasses);
+                upper(newName);
+                if (res != 0) {
+                    res = add(&myArray, newAEM, newName, newNumOfClasses);
+                    if (res == 1) {
+                        printf("\nA-OK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
+                    }
+                    else {
+                        printf("\nA-NOK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
+                    }
+                }
+                break;
+            }
+            case 'r': {
+                scanf("%lu",&AEM);
+                res = rmv(&myArray, AEM);
+                if (res == 1) {
+                    printf("\nR-OK %lu, %d %d\n", AEM, myArray.used, myArray.size);    
+                }
+                else {
+                    printf("\nR-NOK %lu, %d %d\n", AEM, myArray.used, myArray.size);
+                }
+                break;
+            }
+            case 'm': {
+                scanf("%ld %hu", &AEM, &classes);
+                res = mod(&myArray, AEM, classes);
+                if (res == 1) {
+                    printf("\nM-OK %ld\n", AEM);
+                }
+                else {
+                    printf("\nM-NOK %ld\n", AEM);
+                }
+                break;
+            }
+            case 's': {
+                sort(&myArray);
+                printf("\nS-OK\n");
+                break;
+            }
+            case 'f': {
+                scanf("%ld", &AEM);
+                res = find(&myArray, AEM, 0);
+                if (res == -1) {
+                    printf("\nF-NOK %ld\n", AEM);
+                }
+                else {
+                    printf("\nF-OK %s %hu\n", myArray.array[res]->name, myArray.array[res]->numOfClasses);
+                }
+                break;
+            }
+            case 'p': {
+                print(&myArray);
+                break;
+            }
+            case 'c': {
+                clear(&myArray, argv);
+                printf("\nC-OK\n");
+                break;
+            }
+            case 'q': {
+                clear(&myArray, argv);
+                return(0);
+            }
+            case 'g': {
+                scanf("%ld %hu", &AEM, &c_code);
+                res = reg(&myArray, AEM, c_code);
+                if (res == 1) {
+                    printf("\nG-OK %ld %hu\n", AEM, c_code);
+                }
+                else {
+                    printf("\nG-NOK ");
+                    if (res == 0) {
+                        printf("%ld\n", AEM);
+                    }
+                    else {
+                        printf("%hu\n", c_code);
+                    }
+                }
+                break;
+            }
+            case 'u': {
+                scanf("%ld %hu", &AEM, &c_code);
+                res = unreg(&myArray, AEM, c_code);
+                if (res == 1) {
+                    printf("\nU-OK %ld %hu\n", AEM, c_code);
+                }
+                else {
+                    printf("\nU-NOK ");
+                    if (res == 0) {
+                        printf("%ld\n", AEM);
+                    }
+                    else {
+                        printf("%hu\n", c_code);
+                    }
+                }
+                break;
+            }
+            case 'l': {
+                scanf("%lu", &AEM);
+                res = list_courses(&myArray, AEM);
+                if (res == 0) {
+                    printf("\nL-NOK %lu\n", AEM);
+                }
+                break;
+            }
+            case 'n': {
+                scanf("%s", name);
+                array_of_stds = find_by_name(&myArray, name, &num_of_stds);
+                
+                printf("N-OK\n");
+                for (i = 0; i < num_of_stds; i++) {
+                    printf("%ld %hu", array_of_stds[i]->AEM, array_of_stds[i]->numOfClasses);
+                }
+                break;
+            }
+            case 'i': {
+                scanf("%ld %hu", &AEM, &c_code);
+                res = isreg(&myArray, AEM, c_code);
+                if (res == 1) {
+                    printf("\nYES\n");
+                }
+                else if (res == -1) {
+                    printf("\nNO\n");
+                }
+                else {
+                    printf("\nI-NOK %ld\n", AEM);
+                }
+                break;
+            }
+            default: {
+                break;
+            }
+        }
     }
-    else {
-        printf("Not-Found %s\n", str1);
-    }
-    if (find_std(head, str2)) {
-        printf("Found %s\n", str2);
-    }
-    else {
-        printf("Not-Found %s\n", str2);
-    }
-    rmv_std(&head, myArray.array[2]);
-    rmv_std(&head, myArray.array[3]);
-    if (find_std(head, str3)) {
-        printf("Found %s\n", str3);
-    }
-    else {
-        printf("Not-Found %s\n", str3);
-    }
-    if (find_std(head, str4)) {
-        printf("Found %s\n", str4);
-    }
-    else {
-        printf("Not-Found %s\n", str4);
-    }
-    
-    // while (1) {
-    //     scanf(" %c", &func);
-    //     switch (func) {
-    //         case 'a': {
-    //             res = scanf("%lu %s %hu", &newAEM, newName, &newNumOfClasses);
-    //             upper(newName);
-    //             if (res != 0) {
-    //                 res = add(&myArray, newAEM, newName, newNumOfClasses);
-    //                 if (res == 1) {
-    //                     printf("\nA-OK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
-    //                 }
-    //                 else {
-    //                     printf("\nA-NOK %lu, %d %d\n", newAEM, myArray.used, myArray.size);
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //         case 'r': {
-    //             scanf("%lu",&AEM);
-    //             res = rmv(&myArray, AEM);
-    //             if (res == 1) {
-    //                 printf("\nR-OK %lu, %d %d\n", AEM, myArray.used, myArray.size);    
-    //             }
-    //             else {
-    //                 printf("\nR-NOK %lu, %d %d\n", AEM, myArray.used, myArray.size);
-    //             }
-    //             break;
-    //         }
-    //         case 'm': {
-    //             scanf("%ld %hu", &AEM, &classes);
-    //             res = mod(&myArray, AEM, classes);
-    //             if (res == 1) {
-    //                 printf("\nM-OK %ld\n", AEM);
-    //             }
-    //             else {
-    //                 printf("\nM-NOK %ld\n", AEM);
-    //             }
-    //             break;
-    //         }
-    //         case 's': {
-    //             sort(&myArray);
-    //             printf("\nS-OK\n");
-    //             break;
-    //         }
-    //         case 'f': {
-    //             scanf("%ld", &AEM);
-    //             res = find(&myArray, AEM, 0);
-    //             if (res == -1) {
-    //                 printf("\nF-NOK %ld\n", AEM);
-    //             }
-    //             else {
-    //                 printf("\nF-OK %s %hu\n", myArray.array[res]->name, myArray.array[res]->numOfClasses);
-    //             }
-    //             break;
-    //         }
-    //         case 'p': {
-    //             print(&myArray);
-    //             break;
-    //         }
-    //         case 'c': {
-    //             clear(&myArray);
-    //             printf("\nC-OK\n");
-    //             break;
-    //         }
-    //         case 'q': {
-    //             clear(&myArray);
-    //             return(0);
-    //         }
-    //         case 'g': {
-    //             scanf("%ld %hu", &AEM, &c_code);
-    //             res = reg(&myArray, AEM, c_code);
-    //             if (res == 1) {
-    //                 printf("\nG-OK %ld %hu\n", AEM, c_code);
-    //             }
-    //             else {
-    //                 printf("\nG-NOK ");
-    //                 if (res == 0) {
-    //                     printf("%ld\n", AEM);
-    //                 }
-    //                 else {
-    //                     printf("%hu\n", c_code);
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //         case 'u': {
-    //             scanf("%ld %hu", &AEM, &c_code);
-    //             res = unreg(&myArray, AEM, c_code);
-    //             if (res == 1) {
-    //                 printf("\nU-OK %ld %hu\n", AEM, c_code);
-    //             }
-    //             else {
-    //                 printf("\nU-NOK ");
-    //                 if (res == 0) {
-    //                     printf("%ld\n", AEM);
-    //                 }
-    //                 else {
-    //                     printf("%hu\n", c_code);
-    //                 }
-    //             }
-    //             break;
-    //         }
-    //         case 'l': {
-    //             scanf("%lu", &AEM);
-    //             res = list_courses(&myArray, AEM);
-    //             if (res == 0) {
-    //                 printf("\nL-NOK %lu\n", AEM);
-    //             }
-    //             break;
-    //         }
-    //         case 'i': {
-    //             scanf("%ld %hu", &AEM, &c_code);
-    //             res = isreg(&myArray, AEM, c_code);
-    //             if (res == 1) {
-    //                 printf("\nYES\n");
-    //             }
-    //             else if (res == -1) {
-    //                 printf("\nNO\n");
-    //             }
-    //             else {
-    //                 printf("\nI-NOK %ld\n", AEM);
-    //             }
-    //             break;
-    //         }
-    //         default: {
-    //             break;
-    //         }
-    //     }
-    // }
 }
 
 /*  FUNCTIONS  */
@@ -319,6 +343,7 @@ void arrayInit(studentArray *myArray, char *argv[]) {
     myArray->size = atoi(argv[1]);
     myArray->isSorted = true;
     myArray->k = atoi(argv[2]);
+    init_hash_table(&myArray->table);
 }
 /**/
 void upper(char *str) {
@@ -446,6 +471,7 @@ int add(studentArray *array, int newAEM, char newName[64], unsigned short int ne
         array->isSorted = false;
     }
     array->used++;
+    add_to_hash(array, std);
     return 1;
 }
 /**/
@@ -471,6 +497,7 @@ int rmv(studentArray *array, int AEM) {
         array->isSorted = false;
     }
     array->used--;
+    rmv_from_hash(array, array->array[index]);
     return 1;
 }
 /**/
@@ -498,7 +525,7 @@ void print(studentArray *array) {
     }
 }
 /**/
-void clear(studentArray *array) {
+void clear(studentArray *array, char *argv[]) {
     int i;
     node *ptr, *help;
 
@@ -513,7 +540,9 @@ void clear(studentArray *array) {
     array->size = 0;
     array->used = 0;
     array->isSorted = true;
+
     free(array->array);
+    arrayInit(array, argv);
     return;    
 }
 /**/
@@ -636,38 +665,42 @@ int list_courses(studentArray *array, long unsigned int AEM) {
         return 0;
     }
 }
-
-
-
-
-
+/**/
 
 /*Double linked list functions*/
 
-void init_list(student **head) {
-    *head = (student *) calloc(1,sizeof(student));
-    (*head)->next = *head;
-    (*head)->prev = *head;
+void init_list(bucket *bucket) {
+    bucket->head = (student *) calloc(1,sizeof(student));
+    bucket->head->next = bucket->head;
+    bucket->head->prev = bucket->head;
 }
 /**/
-bool find_std(student *head, char *name) {
+int find_std(bucket bucket, char *name) {
     student *ptr;
+    int num_of_stds=0;
     
-    strcpy(head->name, name);
-    for(ptr = head->next; strcmp(ptr->name, name); ptr = ptr->next);
-    init_string(head->name);
-    if (ptr == head)
-        return false;
-    else 
-        return true;
+    strcpy(bucket.head->name, name);
+    for(ptr = bucket.head->next; strcmp(ptr->name, name); ptr = ptr->next);
+    init_string(bucket.head->name);
+    
+    if (ptr == bucket.head) {
+        return 0;
+    }
+    else {
+        while (strcmp(ptr->name, name) == 0) {
+            num_of_stds++;
+            ptr = ptr->next;
+        }
+        return num_of_stds;
+    }
 }
 /**/
-void insert_std(student **head, student *std) {
+void insert_std(bucket *bucket, student *std) {
     student *ptr;
     /*Define ptr*/
-    strcpy((*head)->name, std->name);
-    (*head)->AEM = std->AEM + 1;
-    for(ptr = (*head)->next; strcmp(ptr->name, std->name) < 0; ptr = ptr->next);
+    strcpy(bucket->head->name, std->name);
+    bucket->head->AEM = std->AEM + 1;
+    for(ptr = bucket->head->next; strcmp(ptr->name, std->name) < 0; ptr = ptr->next);
 
     if (strcmp(ptr->name, std->name) == 0 && std->AEM < ptr->AEM) {
         ptr = ptr->prev;
@@ -677,10 +710,75 @@ void insert_std(student **head, student *std) {
     std->prev = ptr;
     ptr->next = std;
     std->next->prev = std;
+    bucket->size++;
 }
 /**/
-void rmv_std(student **head, student *std) {
+void rmv_std(student *std) {
     std->prev->next = std->next;
     std->next->prev = std->prev;
 }
 /**/
+
+/**Hash table functions**/
+
+int get_hash(hashTable *table, char *str) {
+    return (hash(str) % (table->size));
+}
+/**/
+void init_hash_table(hashTable *table) {
+    int i;
+    
+    table->size = 2;
+    table->load_factor = 0;
+    table->largest_bucket = 0;
+    table->bucketArray = (bucket *) calloc(2, sizeof(bucket));
+    for (i = 0; i < table->size; i++) {    
+        init_list(&table->bucketArray[i]);
+    }
+    return;
+}
+/**/
+int get_load_factor(studentArray *array) {
+    return (array->used / array->table.size);
+}
+void set_largest_bucket(hashTable table) {
+    int max, i;
+
+    for (i = 0, max = table.bucketArray[i].size; i < table.size; i++, (table.bucketArray[i].size > max ? max = table.bucketArray[i].size : 1));
+
+    table.largest_bucket = max;
+}
+
+/**/
+void add_to_hash(studentArray *array, student *std) {
+    insert_std(&array->table.bucketArray[get_hash(&array->table, std->name)], std);
+    int size = array->table.bucketArray[get_hash(&array->table, std->name)].size += 1;
+    if (size > array->table.largest_bucket) {
+        array->table.largest_bucket = size;
+    }
+}
+/**/
+void rmv_from_hash(studentArray *array, student *std) {
+    rmv_std(std);
+    array->table.bucketArray[get_hash(&array->table, std->name)].size -= 1;
+    set_largest_bucket(array->table);
+}
+/**/
+student **find_by_name(studentArray *array, char *name, int *num_of_stds) {
+    int i = 0;
+    *num_of_stds = find_std(array->table.bucketArray[get_hash(&array->table, name)], name);
+    student **array_of_stds = (student **) malloc(*num_of_stds * sizeof(student *));
+    student *ptr = NULL;
+
+    for (i = 0, ptr = array->table.bucketArray[get_hash(&array->table, name)].head; i <= *num_of_stds; ptr = ptr->next) {
+        if (strcmp(name, ptr->name) == 0) {
+            array_of_stds[i] = ptr;
+            i++;
+        }
+    }
+    return array_of_stds;
+}
+/**/
+void rehash(studentArray *array) {
+    return;
+}
