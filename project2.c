@@ -28,7 +28,8 @@ typedef struct bucket {
 
 typedef struct hashTable {
     int size;
-    int load_factor;
+    int min_size;
+    float load_factor;
     int largest_bucket;
     bucket *bucketArray;
 } hashTable;
@@ -159,10 +160,10 @@ int get_hash(hashTable *table, char *str);
 void init_hash_table(hashTable *table);
 /*Initializes an empty hash table*/
 
-int get_load_factor(studentArray *array);
+float get_load_factor(studentArray *array);
 /*Returns the hash tables load facrot*/
 
-void set_largest_bucket(hashTable table);
+void set_largest_bucket(hashTable *table);
 /*Changes the largest bucket's value, if needed*/
 
 void add_to_hash(studentArray *array, student *std);
@@ -183,7 +184,7 @@ and reenters each student to the hash table*/
 /*MAIN*/
 
 int main(int argc, char* argv[]) {
-    if (argc != 3 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
+    if (argc != 4 || atoi(argv[1]) < 0 || atoi(argv[2]) < 1) {
         fprintf(stderr, "\n***\nWrong arguments!\n***\n");
         return 0;
     }
@@ -300,19 +301,24 @@ int main(int argc, char* argv[]) {
             }
             case 'l': {
                 scanf("%lu", &AEM);
+                printf("\n");
                 res = list_courses(&myArray, AEM);
                 if (res == 0) {
-                    printf("\nL-NOK %lu\n", AEM);
+                    printf("L-NOK %lu\n", AEM);
                 }
                 break;
             }
             case 'n': {
                 scanf("%s", name);
+                upper(name);
                 array_of_stds = find_by_name(&myArray, name, &num_of_stds);
-                
-                printf("N-OK\n");
+                if (num_of_stds == 0) {
+                    printf("\nN-NOK %s\n", name);
+                    break;
+                }
+                printf("\nN-OK %s\n", name);
                 for (i = 0; i < num_of_stds; i++) {
-                    printf("%ld %hu", array_of_stds[i]->AEM, array_of_stds[i]->numOfClasses);
+                    printf("%ld %hu\n", array_of_stds[i]->AEM, array_of_stds[i]->numOfClasses);
                 }
                 break;
             }
@@ -341,8 +347,10 @@ int main(int argc, char* argv[]) {
 void arrayInit(studentArray *myArray, char *argv[]) {
     myArray->array = calloc(atoi(argv[1]), sizeof(student *));
     myArray->size = atoi(argv[1]);
+    myArray->used = 0;
     myArray->isSorted = true;
     myArray->k = atoi(argv[2]);
+    myArray->table.min_size = atoi(argv[3]);
     init_hash_table(&myArray->table);
 }
 /**/
@@ -406,14 +414,14 @@ int find(studentArray *array, long unsigned int AEM, int count) {
     if (array->isSorted) {
         res = binarySearch(array->array, AEM, array->used, &count);
         if (count != -1) {
-            fprintf(stderr,"\n$%d\n", count);
+            // fprintf(stderr,"\n$%d\n", count);
         }
         return res;
     }
     else {
         res = linearSearch(array, AEM, &count);
         if (count != -1) {
-            fprintf(stderr,"\n$%d\n", count);
+            // fprintf(stderr,"\n$%d\n", count);
         }
         return res;
     }
@@ -433,7 +441,7 @@ void sort(studentArray *array) {
         array->array[j+1] = key;
     }
     cnt--;
-    fprintf(stderr,"\n$%lu\n", cnt);
+    // fprintf(stderr,"\n$%lu\n", cnt);
     array->isSorted = true;
 }
 /**/
@@ -453,6 +461,7 @@ int add(studentArray *array, int newAEM, char newName[64], unsigned short int ne
     strcpy(std->name, newName);
     std->numOfClasses = newNumOfClasses;
     std->classesHead = NULL;
+    std->next = std->prev = NULL;
     if (array->size == array->used) {
         array->size += array->k;
         help = realloc(array->array, array->size * sizeof(student *));
@@ -471,20 +480,26 @@ int add(studentArray *array, int newAEM, char newName[64], unsigned short int ne
         array->isSorted = false;
     }
     array->used++;
+    std->classesHead = NULL;
     add_to_hash(array, std);
+    rehash(array);
     return 1;
 }
 /**/
 int rmv(studentArray *array, int AEM) {
     int index = find(array, AEM, -1);
-    node *ptr, *prev;
+    node *ptr;
+    node *help;
 
     if (index == -1) {
         return 0;
     }
-    for (prev = array->array[index]->classesHead, ptr = prev->next; ptr->next != NULL; prev = ptr, ptr = ptr->next) {
-        free(prev);
+    for (ptr = array->array[index]->classesHead; ptr != help && ptr != NULL; ) {
+        help = ptr;
+        ptr = ptr->next;
+        rmv_class(&array->array[index]->classesHead, help->code);
     }
+    rmv_from_hash(array, array->array[index]);
     free(array->array[index]);
     array->array[index] = array->array[array->used - 1];
     array->array[array->used - 1] = NULL;
@@ -497,7 +512,8 @@ int rmv(studentArray *array, int AEM) {
         array->isSorted = false;
     }
     array->used--;
-    rmv_from_hash(array, array->array[index]);
+    array->table.load_factor = get_load_factor(array);
+    rehash(array);
     return 1;
 }
 /**/
@@ -514,14 +530,15 @@ int mod(studentArray *array, int AEM, unsigned short int classes) {
 /**/
 void print(studentArray *array) {
     int i;
+    student *ptr;
     printf("\n#\n");
-    for (i=0; i < array->used; i++) {
-        if (array->array[i] != NULL) {
-            printf("%ld %s %hu\n", array->array[i]->AEM, array->array[i]->name, array->array[i]->numOfClasses);
+    printf("%d %d %.2f %d\n", array->table.size, array->used, array->table.load_factor, array->table.largest_bucket);
+    for (i=0; i < array->table.size; i++) {
+        printf("%d %d", i, array->table.bucketArray[i].size);
+        for (ptr = array->table.bucketArray[i].head->next; ptr != array->table.bucketArray[i].head; ptr = ptr->next) {
+            printf(" [%ld %s %hu]", ptr->AEM, ptr->name, ptr->numOfClasses);
         }
-        else {
-            break;
-        }
+        printf("\n\n");
     }
 }
 /**/
@@ -541,15 +558,16 @@ void clear(studentArray *array, char *argv[]) {
     array->used = 0;
     array->isSorted = true;
 
-    free(array->array);
-    arrayInit(array, argv);
+    init_hash_table(&array->table);
+    array->array = realloc(array->array, 0);
+
     return;    
 }
 /**/
 int add_class(node **head, short int code) {
     node *ptr, *prev, *newNode;
 
-    newNode = (node *) malloc(sizeof(node));
+    newNode = (node *) calloc(1, sizeof(node));
     newNode->code = code;
 
     for (ptr = *head, prev = NULL; ptr != NULL && ptr->code <= code; prev = ptr, ptr = ptr->next);
@@ -562,12 +580,13 @@ int add_class(node **head, short int code) {
         return -1;
     }
     if (ptr == *head) {
+        newNode->next = *head;
         *head = newNode;
     }
     else {    
         prev->next = newNode;
+        newNode->next = ptr;
     }
-    newNode->next = ptr;
     return 1;
 }
 /**/
@@ -594,18 +613,24 @@ int rmv_class(node **head, short int code) {
 
     if (ptr != NULL) {
         if (ptr->code == code) {
-            prev->next = ptr->next;
-            free(ptr);
-            return 1;
-        } 
-    }
+            if (prev != NULL) {
+                prev->next = ptr->next;
+                free(ptr);
+                return 1;
+            }
+            else {
+                *head = ptr->next;
+                free(ptr);
+                return 1;
+            }
+        }
+    }   
     return 0;
 }
 /**/
 void print_classes(node *head) {
     node *ptr = head;
     
-    printf("\n#\n");
     while (ptr != NULL) {
         printf("%hu\n", ptr->code);
         ptr = ptr->next;
@@ -658,6 +683,7 @@ int list_courses(studentArray *array, long unsigned int AEM) {
     int index = find(array, AEM, -1);
 
     if (index != -1) {
+        printf("L-OK %s\n", array->array[index]->name);
         print_classes(array->array[index]->classesHead);
         return 1;
     }
@@ -687,6 +713,7 @@ int find_std(bucket bucket, char *name) {
         return 0;
     }
     else {
+        strcpy(bucket.head->name, "\0");
         while (strcmp(ptr->name, name) == 0) {
             num_of_stds++;
             ptr = ptr->next;
@@ -696,21 +723,34 @@ int find_std(bucket bucket, char *name) {
 }
 /**/
 void insert_std(bucket *bucket, student *std) {
-    student *ptr;
+    student *ptr=NULL;
     /*Define ptr*/
     strcpy(bucket->head->name, std->name);
     bucket->head->AEM = std->AEM + 1;
     for(ptr = bucket->head->next; strcmp(ptr->name, std->name) < 0; ptr = ptr->next);
-
-    if (strcmp(ptr->name, std->name) == 0 && std->AEM < ptr->AEM) {
+    
+    if (strcmp(ptr->name, std->name) > 0) {
         ptr = ptr->prev;
     }
+    else {
+        if (ptr->AEM > std->AEM) {
+            ptr = ptr->prev;
+        }
+        else {
+            while (ptr != bucket->head && strcmp(ptr->next->name, std->name) == 0 && ptr->next->AEM < std->AEM) {
+                ptr = ptr->next;
+            }
+        }
+    }
+    
+    
     /*Add std after ptr*/
     std->next = ptr->next;
     std->prev = ptr;
     ptr->next = std;
     std->next->prev = std;
     bucket->size++;
+    init_string(bucket->head->name);
 }
 /**/
 void rmv_std(student *std) {
@@ -728,49 +768,53 @@ int get_hash(hashTable *table, char *str) {
 void init_hash_table(hashTable *table) {
     int i;
     
-    table->size = 2;
+    table->size = table->min_size;
     table->load_factor = 0;
     table->largest_bucket = 0;
-    table->bucketArray = (bucket *) calloc(2, sizeof(bucket));
-    for (i = 0; i < table->size; i++) {    
+    table->bucketArray = (bucket *) calloc(table->size, sizeof(bucket));
+    for (i = 0; i < table->size; i++) {
+        table->bucketArray[i].size = 0;    
         init_list(&table->bucketArray[i]);
     }
     return;
 }
 /**/
-int get_load_factor(studentArray *array) {
-    return (array->used / array->table.size);
+float get_load_factor(studentArray *array) {
+    return ((float) array->used / array->table.size);
 }
-void set_largest_bucket(hashTable table) {
-    int max, i;
+void set_largest_bucket(hashTable *table) {
+    int max=0, i;
 
-    for (i = 0, max = table.bucketArray[i].size; i < table.size; i++, (table.bucketArray[i].size > max ? max = table.bucketArray[i].size : 1));
+    for (i = 0, max = table->bucketArray[i].size; i < table->size - 1; i++, (table->bucketArray[i].size > max ? max = table->bucketArray[i].size : 1));
 
-    table.largest_bucket = max;
+    table->largest_bucket = max;
 }
 
 /**/
 void add_to_hash(studentArray *array, student *std) {
     insert_std(&array->table.bucketArray[get_hash(&array->table, std->name)], std);
-    int size = array->table.bucketArray[get_hash(&array->table, std->name)].size += 1;
+    int size = array->table.bucketArray[get_hash(&array->table, std->name)].size;
     if (size > array->table.largest_bucket) {
         array->table.largest_bucket = size;
     }
+    set_largest_bucket(&array->table);
+    array->table.load_factor = get_load_factor(array);
 }
 /**/
 void rmv_from_hash(studentArray *array, student *std) {
     rmv_std(std);
     array->table.bucketArray[get_hash(&array->table, std->name)].size -= 1;
-    set_largest_bucket(array->table);
+    set_largest_bucket(&array->table);
 }
 /**/
 student **find_by_name(studentArray *array, char *name, int *num_of_stds) {
     int i = 0;
+    *num_of_stds = 0;
     *num_of_stds = find_std(array->table.bucketArray[get_hash(&array->table, name)], name);
-    student **array_of_stds = (student **) malloc(*num_of_stds * sizeof(student *));
+    student **array_of_stds = (student **) calloc((*num_of_stds), sizeof(student *));
     student *ptr = NULL;
 
-    for (i = 0, ptr = array->table.bucketArray[get_hash(&array->table, name)].head; i <= *num_of_stds; ptr = ptr->next) {
+    for (i = 0, ptr = array->table.bucketArray[get_hash(&array->table, name)].head; i < *num_of_stds; ptr = ptr->next) {
         if (strcmp(name, ptr->name) == 0) {
             array_of_stds[i] = ptr;
             i++;
@@ -780,5 +824,41 @@ student **find_by_name(studentArray *array, char *name, int *num_of_stds) {
 }
 /**/
 void rehash(studentArray *array) {
-    return;
+    float lf = get_load_factor(array);
+    int i;
+    /*Check if rehash is needed*/
+    if (lf > 1 && lf < 4) {
+        return;
+    }
+    if (lf <= 1 && array->table.size == array->table.min_size) {
+        return;
+    }
+    /*Empty the bucket array*/
+    for (i = 0; i < array->table.size; i++) {
+        array->table.bucketArray[i].head = NULL;
+    }
+    /*Define the new size of the table*/
+    if (lf <= 1) {
+        array->table.size = array->table.size / 2;
+    }
+    if (lf >= 4) {
+        array->table.size *= 2;
+    }
+
+    /*Change the arrays size, to the defined one*/
+    array->table.bucketArray = realloc(array->table.bucketArray, array->table.size * sizeof(bucket));
+
+    /*Initialize the hash table*/
+    array->table.load_factor = 0;
+    array->table.largest_bucket = 0;
+    for (i = 0; i < array->table.size; i++) { 
+        init_list(&array->table.bucketArray[i]);
+        array->table.bucketArray[i].size = 0; 
+    }   
+
+    /*Add every student to the new array*/
+    for (i = 0; i < array->used; i++) {
+        array->array[i]->next = array->array[i]->prev = NULL;
+        add_to_hash(array, array->array[i]);
+    }
 }
